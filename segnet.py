@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import Softmax
 from snake import DySnakeConv
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
@@ -32,7 +33,7 @@ class Conv(nn.Module):
         return self.act(self.conv(x))
     
 def INF(B,H,W):
-     return -torch.diag(torch.tensor(float("inf")).repeat(H),0).unsqueeze(0).repeat(B*W,1,1).to('cpu')
+     return -torch.diag(torch.tensor(float("inf")).repeat(H),0).unsqueeze(0).repeat(B*W,1,1).to(device)
 
 class CrissCrossAttention(nn.Module):
     """ Criss-Cross Attention Module"""
@@ -739,7 +740,7 @@ class Decoder(nn.Module):
         fm3_up_scale = self.up_scalefm3(fm3)
 
         fm4 = torch.concat([out1, fm3_up_scale, fm2_up_scale], dim=1)
-        print(fm4.shape)
+  
         return fm4
 
 class Segnet(nn.Module):
@@ -749,10 +750,11 @@ class Segnet(nn.Module):
         self.encoder = Yolov11Backbone(version=version)
         self.decoder = Decoder(version=version)
         self.segmetation = CCUpsampleConnection4x(int(min(128, mc) * w) + int(min(512, mc) * w) + int(min(512, mc) * w), num_classes)
+        self.conv = Conv(num_classes, num_classes)
 
     def forward(self, x):
         out1,out2,out3,out4 = self.encoder(x)
         out = self.decoder(out1,out2,out3,out4)
         out = self.segmetation(out)
-
-        return x
+        out = self.conv(out)
+        return out
