@@ -704,14 +704,14 @@ class Decoder(nn.Module):
         self.down_scale2 = DownsampleConnection(int(min(256, mc) * w),int(min(512, mc) * w))
 
         self.down_ca = DownsampleConnection(int(min(512, mc) * w),int(min(256, mc) * w))
-        self.down_sa = DownsampleConnection(int(min(1024, mc) * w),int(min(512, mc) * w))
+        self.down_sa = DownsampleConnection(int(min(512, mc) * w) + int(min(512, mc) * w),int(min(512, mc) * w))
 
-        self.ca = ChannelAttention(int(min(256, mc) * w))
+        self.ca = ChannelAttention(int(min(256, mc) * w) + int(min(128, mc) * w))
         self.sa = SpatialAttention()
 
-        self.up_scalefm1 = CCUpsampleConnection4x(int(min(1024, mc) * w) + int(min(512, mc) * w), int(min(256, mc) * w))
-        self.up_scalefm2 = CCUpsampleConnection4x(int(min(1024, mc) * w) + int(min(256, mc) * w), int(min(512, mc) * w))
-        self.up_scalefm3 = CCUpsampleConnection2x(int(min(512, mc) * w) + int(min(256, mc) * w), int(min(512, mc) * w))
+        self.up_scalefm1 = UpsampleConnection4x(int(min(1024, mc) * w) + int(min(512, mc) * w), int(min(256, mc) * w))
+        self.up_scalefm2 = UpsampleConnection4x(int(min(512, mc) * w) + int(min(256, mc) * w) + int(min(512, mc) * w), int(min(512, mc) * w))
+        self.up_scalefm3 = UpsampleConnection2x(int(min(512, mc) * w) + int(min(256, mc) * w), int(min(512, mc) * w))
         self.sppf = SPPF(int(min(1024, mc) * w), int(min(1024, mc) * w))
         self.c2psa = C2PSA(int(min(1024, mc) * w), int(min(1024, mc) * w), n=3, e=0.5)
 
@@ -756,14 +756,3 @@ class Segnet(nn.Module):
         out = self.segmetation(out)
 
         return x
-
-dummy_input = torch.randn(1, 3, 224, 224)  # Example shape, adjust as needed
-
-# Initialize the Segnet model
-model = Segnet(num_classes=21, version='n')  # Adjust num_classes and version as needed
-
-# Pass the dummy input through the model
-output = model(dummy_input)
-
-# Print the output shape
-print("wwo", output.shape)

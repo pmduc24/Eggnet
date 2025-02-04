@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 
-# Tải MobileNetV3 Small hoặc Large
-backbone = models.mobilenet_v3_small(pretrained=True) 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
