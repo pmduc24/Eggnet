@@ -355,20 +355,22 @@ class Yolov11Backbone(nn.Module):
         x = self.conv1(x)
         x = self.conv2(x)
         out1 = self.c3k2_3(x)
-        x = self.conv4(out1)
-        x = self.focus4(x)
+        
+        x = self.focus4(out1)
+        x = self.conv4(x)
+
         out2 = self.c3k2_5(x)
-        x = self.conv6(out2)
-        x = self.focus6(x)
+        
+        x = self.focus6(out2)
+        x = self.conv6(x)
         out3 = self.c3k2_7(x)
-        x = self.conv8(out3)
-        x = self.focus8(x)
+
+        x = self.focus8(out3)
+        x = self.conv8(x)
+
         out4 = self.c3k2_9(x)
 
-        return out1,out2,out3, out4
-
-
-import torch.nn as nn
+        return out1, out2, out3, out4
 
 class ChannelAttention(nn.Module):
     def __init__(self, channels, reduction_rate=16):
