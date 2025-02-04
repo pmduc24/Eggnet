@@ -293,6 +293,47 @@ class Focus(nn.Module):
         return self.conv(torch.cat((x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]), 1))
         # return self.conv(self.contract(x))
 
+class CCUpsampleConnection4x(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(CCUpsampleConnection4x, self).__init__()
+        
+        self.conv1x1_1 = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.dilated_conv1 = nn.Conv2d(out_channels, out_channels, kernel_size=3, dilation=6, padding=6)
+        self.carafe1 = CARAFE(out_channels, scale=2)  # First 2x upsampling
+
+        self.relu = nn.ReLU()
+        self.conv1x1_2 = nn.Conv2d(out_channels, out_channels, kernel_size=1)
+        self.dilated_conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, dilation=12, padding=12)
+        self.carafe2 = CARAFE(out_channels, scale=2)  # Second 2x upsampling
+        
+    def forward(self, x):
+        x = self.conv1x1_1(x)
+        x = self.dilated_conv1(x)
+        x = self.carafe1(x)
+
+        x = self.relu(x)
+        x = self.conv1x1_2(x)
+        x = self.dilated_conv2(x)
+        x = self.carafe2(x)
+        
+        return x
+
+class CCUpsampleConnection2x(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(CCUpsampleConnection2x, self).__init__()
+
+        self.conv1x1 = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.dilated_conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, dilation=6, padding=6)
+        self.carafe = CARAFE(out_channels, scale=2)  # Single 2x upsampling
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.conv1x1(x)
+        x = self.dilated_conv(x)
+        x = self.carafe(x)
+        x = self.relu(x)
+        return x
+
 class CARAFE(nn.Module):
     def __init__(self, c, k_enc=3, k_up=5, c_mid=64, scale=2):
         """ The unofficial implementation of the CARAFE module.
@@ -355,22 +396,22 @@ class Yolov11Backbone(nn.Module):
         x = self.conv1(x)
         x = self.conv2(x)
         out1 = self.c3k2_3(x)
-        
-        x = self.focus4(out1)
-        x = self.conv4(x)
+        x = self.conv4(out1)
+        x = self.focus4(x)
 
         out2 = self.c3k2_5(x)
+        x = self.conv6(out2)
+        x = self.focus6(x)
         
-        x = self.focus6(out2)
-        x = self.conv6(x)
         out3 = self.c3k2_7(x)
-
-        x = self.focus8(out3)
-        x = self.conv8(x)
-
+        x = self.conv8(out3)
+        x = self.focus8(x)
         out4 = self.c3k2_9(x)
 
-        return out1, out2, out3, out4
+        return out1,out2,out3, out4
+
+
+import torch.nn as nn
 
 class ChannelAttention(nn.Module):
     def __init__(self, channels, reduction_rate=16):
@@ -668,9 +709,9 @@ class Decoder(nn.Module):
         self.ca = ChannelAttention(int(min(256, mc) * w))
         self.sa = SpatialAttention()
 
-        self.up_scalefm1 = UpsampleConnection4x(int(min(1024, mc) * w) + int(min(512, mc) * w), int(min(256, mc) * w))
-        self.up_scalefm2 = UpsampleConnection4x(int(min(1024, mc) * w) + int(min(256, mc) * w), int(min(512, mc) * w))
-        self.up_scalefm3 = UpsampleConnection2x(int(min(512, mc) * w) + int(min(256, mc) * w), int(min(512, mc) * w))
+        self.up_scalefm1 = CCUpsampleConnection4x(int(min(1024, mc) * w) + int(min(512, mc) * w), int(min(256, mc) * w))
+        self.up_scalefm2 = CCUpsampleConnection4x(int(min(1024, mc) * w) + int(min(256, mc) * w), int(min(512, mc) * w))
+        self.up_scalefm3 = CCUpsampleConnection2x(int(min(512, mc) * w) + int(min(256, mc) * w), int(min(512, mc) * w))
         self.sppf = SPPF(int(min(1024, mc) * w), int(min(1024, mc) * w))
         self.c2psa = C2PSA(int(min(1024, mc) * w), int(min(1024, mc) * w), n=3, e=0.5)
 
@@ -707,7 +748,7 @@ class Segnet(nn.Module):
         d, w, mc = yolo_params(version)
         self.encoder = Yolov11Backbone(version=version)
         self.decoder = Decoder(version=version)
-        self.segmetation = UpsampleConnection4x(int(min(128, mc) * w) + int(min(512, mc) * w) + int(min(512, mc) * w), num_classes)
+        self.segmetation = CCUpsampleConnection4x(int(min(128, mc) * w) + int(min(512, mc) * w) + int(min(512, mc) * w), num_classes)
 
     def forward(self, x):
         out1,out2,out3,out4 = self.encoder(x)

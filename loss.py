@@ -4,6 +4,25 @@ from torchmetrics.segmentation import GeneralizedDiceScore
 from torchmetrics.segmentation import MeanIoU
 from torchmetrics import MetricCollection
 
+class Unified(nn.Module):
+    """Unified activation function module."""
+
+    def __init__(self, device=None, dtype=None) -> None:
+        """Initialize the Unified activation function."""
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        lambda_param = torch.nn.init.uniform_(torch.empty(1, **factory_kwargs))
+        kappa_param = torch.nn.init.uniform_(torch.empty(1, **factory_kwargs))
+        self.softplus = nn.Softplus(beta=-1.0)
+        self.lambda_param = nn.Parameter(lambda_param)
+        self.kappa_param = nn.Parameter(kappa_param)
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        """Compute the forward pass of the Unified activation function."""
+        l = torch.clamp(self.lambda_param, min=0.0001)
+        p = torch.exp((1 / l) * self.softplus((self.kappa_param * input) - torch.log(l)))
+        return p * input # for AGLU simply return p*input
+
 def dice_loss(pred, target, smooth=1e-6):
     # Dự đoán (sau softmax) và nhãn one-hot
     pred = torch.softmax(pred, dim=1)  # [batch_size, num_classes, H, W]
