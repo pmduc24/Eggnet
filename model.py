@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import Softmax
+from snake import DySnakeConv
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
@@ -339,14 +340,14 @@ class Yolov11Backbone(nn.Module):
         self.conv1 = Conv(in_channels, int(min(64, mc) * w), 3, 2, 1)
         self.conv2 = Conv(int(min(64, mc) * w), int(min(128, mc) * w), 3, 2, 1)
         self.c3k2_3 = C3k2CC(int(min(128, mc) * w), int(min(128, mc) * w), n = int(3 * d), shortcut=False)
-        self.conv4 = Conv(int(min(128, mc) * w), int(min(256, mc) * w), 3, 2, 1)
+        self.conv4 = DySnakeConv(int(min(128, mc) * w), int(min(256, mc) * w), 3)
         self.focus4 = Focus(int(min(256, mc) * w), int(min(256, mc) * w))
         self.c3k2_5 = C3k2CC(int(min(256, mc) * w), int(min(256, mc) * w), n= int(6 * d), shortcut=False)
-        self.conv6 = Conv(int(min(256, mc) * w), int(min(512, mc) * w), 3, 2, 1)
+        self.conv6 = DySnakeConv(int(min(256, mc) * w), int(min(512, mc) * w), 3)
         self.focus6 = Focus(int(min(512, mc) * w), int(min(512, mc) * w))
         self.c3k2_7 = C3k2CC(int(min(512, mc) * w), int(min(512, mc) * w), n= int(6 * d), shortcut=True)
-        self.conv8 = Conv(int(min(512, mc) * w), int(min(1024, mc) * w), 3, 2, 1)
         self.focus8 = Focus(int(min(1024, mc) * w), int(min(1024, mc) * w))
+        self.conv8 = DySnakeConv(int(min(512, mc) * w), int(min(1024, mc) * w), 3)
         self.c3k2_9 = C3k2CC(int(min(1024, mc) * w), int(min(1024, mc) * w), n= int(3 * d), shortcut=True)
 
     def forward(self, x):
@@ -722,4 +723,4 @@ model = Segnet(num_classes=21, version='n')  # Adjust num_classes and version as
 output = model(dummy_input)
 
 # Print the output shape
-print(output.shape)
+print("wwo", output.shape)

@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+import torchvision.models as models
 
 # Tải MobileNetV3 Small hoặc Large
 backbone = models.mobilenet_v3_small(pretrained=True) 
