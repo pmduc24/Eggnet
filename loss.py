@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torchmetrics.segmentation import GeneralizedDiceScore
 from torchmetrics.segmentation import MeanIoU
-from torchmetrics import MetricCollection
 
 class Unified(nn.Module):
     """Unified activation function module."""
