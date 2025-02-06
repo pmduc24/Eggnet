@@ -714,7 +714,7 @@ class Decoder(nn.Module):
         self.up_scalefm2 = UpsampleConnection4x(int(min(512, mc) * w) + int(min(256, mc) * w) + int(min(512, mc) * w), int(min(512, mc) * w))
         self.up_scalefm3 = UpsampleConnection2x(int(min(512, mc) * w) + int(min(256, mc) * w), int(min(512, mc) * w))
         self.sppf = SPPF(int(min(1024, mc) * w), int(min(1024, mc) * w))
-        self.c2psa = C2PSA(int(min(1024, mc) * w), int(min(1024, mc) * w), n=3, e=0.5)
+        # self.c2psa = C2PSA(int(min(1024, mc) * w), int(min(1024, mc) * w), n=3, e=0.5)
 
     def forward(self, out1, out2, out3, out4):
         down_scale_out1 = self.down_scale1(out1)    
@@ -727,7 +727,7 @@ class Decoder(nn.Module):
         down_scale_sa = self.down_sa(out_sa)
 
         sppf_out = self.sppf(out4)
-        out4 = self.c2psa(out4)
+        # out4 = self.c2psa(out4)
 
         fm1 = torch.concat([sppf_out, down_scale_sa],dim=1)
         fm1_up_scale = self.up_scalefm1(fm1)
@@ -744,17 +744,24 @@ class Decoder(nn.Module):
         return fm4
 
 class Segnet(nn.Module):
-    def __init__(self, num_classes, version='n'):
+    def __init__(self, num_classes, class_names, version='n'):
         super(Segnet, self).__init__()
         d, w, mc = yolo_params(version)
+        self.class_names = class_names
         self.encoder = Yolov11Backbone(version=version)
         self.decoder = Decoder(version=version)
-        self.segmetation = CCUpsampleConnection4x(int(min(128, mc) * w) + int(min(512, mc) * w) + int(min(512, mc) * w), num_classes)
-        self.conv = Conv(num_classes, num_classes)
+        self.segmetation = CCUpsampleConnection4x(int(min(128, mc) * w) + int(min(512, mc) * w) + int(min(512, mc) * w), 64)
+
+        self.conv1 = Conv(64, 32, 1, 1)
+        self.c3k2_1 = C3k2(32, 16, n=1, c3k=False, e=0.5, g=1, shortcut=True)
+        # Output Layer
+        self.output_last = nn.Conv2d(16, num_classes, kernel_size=1)
 
     def forward(self, x):
         out1,out2,out3,out4 = self.encoder(x)
         out = self.decoder(out1,out2,out3,out4)
         out = self.segmetation(out)
-        out = self.conv(out)
+        out = self.conv1(out)
+        out = self.c3k2_1(out)
+        out = self.output_last(out)
         return out
