@@ -1,6 +1,14 @@
 import numpy as np
 from sklearn.metrics import precision_score, recall_score, jaccard_score
 import torch
+from segnet import Segnet
+import argparse
+from torchvision import transforms
+import os
+import json
+from dataset import CustomDataset  
+from loss import DiceCrossEntropyLoss
+from torch.utils.data import DataLoader
 
 def acc_per_class(y_true, y_pred):
     """
@@ -89,3 +97,51 @@ def print_validation_results(metrics, class_names):
     # Print results for each class
     for i in range(1, len(class_names)):
         print(f"{class_names[i]}\t\t{metrics['precision'][i-1]:.4f}\t\t{metrics['recall'][i-1]:.4f}\t\t{metrics['class_accuracy'][i]:.4f}\t\t{metrics['iou'][i-1]:.4f}")
+
+def main():
+    parser = argparse.ArgumentParser(description='Validate a segmentation model')
+    parser.add_argument('--model_path', type=str, required=True, help='Path to trained model')
+    parser.add_argument('--version', type=str, required=True, choices=['n', 's', 'm', 'l', 'x'], help='Version of model')
+    parser.add_argument('--root_dir', type=str, required=True, help='Path to validation data')
+    parser.add_argument('--batch_size', type=int, default=16, help='Batch size')
+    parser.add_argument('--device', type=str, default='cuda', choices=['cpu', 'cuda'], help='Device to use')
+    parser.add_argument('--num_classes', type=int, default=80, help='Number of output classes')
+    parser.add_argument('--imgsz', type=int, default=640, help='Image size')
+    
+    args = parser.parse_args()
+    
+    with open(os.path.join(args.root_dir, "valid", "_annotations.coco.json"), "r") as f:
+        coco_data = json.load(f)
+    
+    class_names = {cat["id"]: cat["name"] for cat in coco_data["categories"]}
+    
+    device = torch.device(args.device)
+    model = Segnet(num_classes=args.num_classes, class_names=class_names)
+    model.load_state_dict(torch.load(args.model_path, map_location=device))
+    model.to(device)
+    
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+    
+    data_transforms = {
+        'Image': transforms.Compose([
+            transforms.ToPILImage(),                      
+            transforms.Resize((args.imgsz, args.imgsz)),           
+            transforms.ToTensor(),           
+            transforms.Normalize(mean, std)          
+        ]),
+        'Mask': transforms.Compose([
+            transforms.Resize((args.imgsz, args.imgsz)),          
+        ])
+    }
+    
+    val_dataset = CustomDataset(args.root_dir, mode='valid', transform=data_transforms)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    
+    criterion = DiceCrossEntropyLoss()
+    metrics = validate_model(model, val_loader, criterion, device, class_names)
+    
+    print_validation_results(metrics, class_names)
+
+if __name__ == '__main__':
+    main()

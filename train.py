@@ -74,13 +74,11 @@ def main():
 
     class_names = {cat["id"]: cat["name"] for cat in coco_data["categories"]}
 
-    # Chọn device (CPU hoặc GPU)
-    device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
+    device = torch.device(args.device)
     
     model = Segnet(num_classes=args.num_classes, class_names=class_names, version=args.version)
     model.to(device)
 
-    # Tải dữ liệu
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
 
@@ -104,11 +102,9 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
-    # Định nghĩa criterion và optimizer
     criterion = DiceCrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
-    # Huấn luyện mô hình
     train(model, train_loader, val_loader, criterion, optimizer, device, class_names, args.num_epochs, args.save_path)
 
 if __name__ == '__main__':
