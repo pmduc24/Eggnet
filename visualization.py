@@ -10,23 +10,14 @@ from segnet import Segnet
 import json
 
 def visualize_predictions(model, dataloader, device, output_dir, num_samples=5):
-    """
-    Lưu ảnh gốc, mask ground truth và mask dự đoán vào thư mục chỉ định.
-    
-    Args:
-        model: Mô hình segmentation đã train.
-        dataloader: Dataloader chứa dữ liệu test.
-        device: Thiết bị chạy mô hình ('cuda' hoặc 'cpu').
-        output_dir: Thư mục lưu ảnh kết quả.
-        num_samples: Số lượng mẫu muốn hiển thị.
-    """
+
     os.makedirs(output_dir, exist_ok=True)
     model.eval()
     
     samples = random.sample(list(dataloader), num_samples)
 
-    mean = np.array([0.485, 0.456, 0.406])  # Mean chuẩn hóa
-    std = np.array([0.229, 0.224, 0.225])  # Std chuẩn hóa
+    mean = np.array([0.485, 0.456, 0.406])  
+    std = np.array([0.229, 0.224, 0.225])  
 
     for i, sample in enumerate(samples):
         inputs = sample['image'].to(device)
@@ -34,16 +25,21 @@ def visualize_predictions(model, dataloader, device, output_dir, num_samples=5):
         masks = masks.squeeze(1)
 
         outputs = model(inputs)
-
         y_pred = torch.argmax(outputs, dim=1).data.cpu().numpy()
         y_true = masks.data.cpu().numpy()
 
-        # Chuyển ảnh về định dạng có thể hiển thị
         img = inputs.squeeze(0).permute(1, 2, 0).cpu().numpy()  
-        img = (img * std) + mean  # Đảo chuẩn hóa
-        img = np.clip(img, 0, 1)  # Đảm bảo giá trị nằm trong khoảng [0,1]
+        img = (img * std) + mean  
+        img = np.clip(img, 0, 1)  
 
-        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+
+        y_pred_colored = colorize_mask(y_pred[0])
+        y_true_colored = colorize_mask(y_true[0])
+
+        overlay_pred = (img * 0.5 + y_pred_colored * 0.5)  
+        overlay_true = (img * 0.5 + y_true_colored * 0.5)  
+
+        fig, axes = plt.subplots(1, 5, figsize=(15, 5))
         axes[0].imshow(img)
         axes[0].set_title("Original Image")
         axes[0].axis("off")
@@ -56,6 +52,14 @@ def visualize_predictions(model, dataloader, device, output_dir, num_samples=5):
         axes[2].set_title("Predicted Mask")
         axes[2].axis("off")
 
+        axes[3].imshow(overlay_true)
+        axes[3].set_title("Overlay Ground Truth")
+        axes[3].axis("off")
+
+        axes[4].imshow(overlay_pred)
+        axes[4].set_title("Overlay Prediction")
+        axes[4].axis("off")
+
         plt.tight_layout()
         save_path = os.path.join(output_dir, f"sample_{i}.png")
         plt.savefig(save_path)
@@ -63,10 +67,10 @@ def visualize_predictions(model, dataloader, device, output_dir, num_samples=5):
         print(f"Saved: {save_path}")
 
 def colorize_mask(mask):
-    """Chuyển đổi mask nhãn thành ảnh màu để dễ nhìn hơn."""
+
     num_classes = np.max(mask) + 1
     colors = plt.cm.get_cmap("jet", num_classes)
-    mask_colored = colors(mask / num_classes)[:, :, :3] 
+    mask_colored = colors(mask / num_classes)[:, :, :3]  
     return mask_colored
 
 if __name__ == "__main__":
